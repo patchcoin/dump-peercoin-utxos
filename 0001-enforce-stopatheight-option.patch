@@ -1,0 +1,104 @@
+From 7c91d89514d8a188be8c028f31aa681081daa754 Mon Sep 17 00:00:00 2001
+From: patchcoin-dev <189779141+patchcoin-dev@users.noreply.github.com>
+Date: Sun, 16 Feb 2025 00:15:00 +0100
+Subject: [PATCH] enforce stopatheight option
+
+---
+ src/net_processing.cpp | 15 +++++++++++++++
+ src/validation.cpp     | 26 ++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/src/net_processing.cpp b/src/net_processing.cpp
+index 458216906..87bf81831 100755
+--- a/src/net_processing.cpp
++++ b/src/net_processing.cpp
+@@ -1363,6 +1363,7 @@ void PeerManagerImpl::FindNextBlocksToDownload(const Peer& peer, unsigned int co
+     int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
+     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+     NodeId waitingfor = -1;
++    int nStopAtHeight = gArgs.GetIntArg("-stopatheight", DEFAULT_STOPATHEIGHT);
+     while (pindexWalk->nHeight < nMaxHeight) {
+         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
+         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
+@@ -1380,6 +1381,9 @@ void PeerManagerImpl::FindNextBlocksToDownload(const Peer& peer, unsigned int co
+         // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
+         // already part of our chain.
+         for (const CBlockIndex* pindex : vToFetch) {
++            if (nStopAtHeight > 0 && pindex->nHeight > nStopAtHeight) {
++                continue;
++            }
+             if (!pindex->IsValid(BLOCK_VALID_TREE)) {
+                 // We consider the chain that this peer is on invalid.
+                 return;
+@@ -4676,6 +4680,17 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type,
+ 
+         LogPrint(BCLog::NET, "received block %s peer=%d\n", pblock2->GetHash().ToString(), pfrom.GetId());
+ 
++        int nStopAtHeight = gArgs.GetIntArg("-stopatheight", DEFAULT_STOPATHEIGHT);
++        if (nStopAtHeight > 0) {
++            LOCK(m_chainman.GetMutex());
++            const CBlockIndex* activeTip = m_chainman.ActiveChain().Tip();
++            if (activeTip && activeTip->nHeight >= nStopAtHeight) {
++                LogPrint(BCLog::NET, "Ignoring block %s as stop height %d has been reached\n",
++                         pblock2->GetHash().ToString(), nStopAtHeight);
++                return;
++            }
++        }
++
+         CBlockIndex* tip;
+         CBlockIndex* prev_block{WITH_LOCK(m_chainman.GetMutex(), return m_chainman.m_blockman.LookupBlockIndex(pblock2->hashPrevBlock))};
+         // Check for possible mutation if it connects to something we know so we can check for DEPLOYMENT_SEGWIT being active
+diff --git a/src/validation.cpp b/src/validation.cpp
+index dd655d0db..79a95683e 100644
+--- a/src/validation.cpp
++++ b/src/validation.cpp
+@@ -2629,6 +2629,16 @@ public:
+  */
+ bool Chainstate::ConnectTip(BlockValidationState& state, CBlockIndex* pindexNew, const std::shared_ptr<const CBlock>& pblock, ConnectTrace& connectTrace, DisconnectedBlockTransactions& disconnectpool)
+ {
++    int nStopAtHeight = gArgs.GetIntArg("-stopatheight", DEFAULT_STOPATHEIGHT);
++    if (nStopAtHeight > 0 && pindexNew->nHeight > nStopAtHeight) {
++        LogPrintf("Block %s (height %d) exceeds stop height %d; stopping sync\n",
++                  pindexNew->GetBlockHash().ToString(),
++                  pindexNew->nHeight,
++                  nStopAtHeight);
++        state.Error("Block height exceeds stop height");
++        return false;
++    }
++
+     AssertLockHeld(cs_main);
+     if (m_mempool) AssertLockHeld(m_mempool->cs);
+ 
+@@ -3828,6 +3838,12 @@ bool ChainstateManager::ProcessNewBlockHeaders(int32_t& nPoSTemperature, const u
+ void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t height, int64_t timestamp)
+ {
+     AssertLockNotHeld(cs_main);
++
++    int nStopAtHeight = gArgs.GetIntArg("-stopatheight", DEFAULT_STOPATHEIGHT);
++    if (nStopAtHeight > 0 && height > nStopAtHeight) {
++        return;
++    }
++
+     const auto& chainstate = ActiveChainstate();
+     {
+         LOCK(cs_main);
+@@ -3868,6 +3884,16 @@ bool Chainstate::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockV
+     if (!accepted_header)
+         return false;
+ 
++    int nStopAtHeight = gArgs.GetIntArg("-stopatheight", DEFAULT_STOPATHEIGHT);
++    if (nStopAtHeight > 0 && pindex->nHeight > nStopAtHeight) {
++        LogPrintf("Block %s (height %d) exceeds stop height %d; rejecting block\n",
++                  pindex->GetBlockHash().ToString(),
++                  pindex->nHeight,
++                  nStopAtHeight);
++        state.Error("Block height exceeds stop height");
++        return false;
++    }
++
+     // peercoin: we should only accept blocks that can be connected to a prev block with validated PoS
+     if (fCheckPoS && pindex->pprev && !pindex->pprev->IsValid(BLOCK_VALID_TRANSACTIONS)) {
+         return error("%s: this block does not connect to any valid known block", __func__);
+-- 
+2.48.1
+

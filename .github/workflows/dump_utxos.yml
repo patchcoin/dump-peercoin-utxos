@@ -1,0 +1,40 @@
+name: Peercoin UTXO Dump
+
+on:
+  workflow_dispatch:
+    inputs:
+      stopHeight:
+        description: 'Blockchain height at which to stop sync'
+        required: true
+        default: '1000'
+
+jobs:
+  peercoin-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Task
+        run: |
+          curl -sL https://taskfile.dev/install.sh | sh
+          sudo mv ./bin/task /usr/local/bin/task
+
+      - run: task build
+
+      - env:
+          STOP_HEIGHT: ${{ github.event.inputs.stopHeight }}
+        run: task sync
+
+      - run: task dump-utxos
+
+      - run: cp peercoin-data/peercoin_utxos.dat .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "utxo-dump-${{ github.event.inputs.stopHeight }}"
+          name: "Peercoin UTXO Dump at block height ${{ github.event.inputs.stopHeight }}"
+          body: "Peercoin UTXO dump generated at block height ${{ github.event.inputs.stopHeight }}."
+          files: |
+            peercoin_utxos.dat

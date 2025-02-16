@@ -1,0 +1,31 @@
+version: '3'
+
+env:
+  STOP_HEIGHT: '{{.STOP_HEIGHT | default "1000"}}'
+
+tasks:
+  build:
+    desc: Build the Docker image
+    cmds:
+      - docker build --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t peercoin-node .
+    sources:
+      - Dockerfile
+      - 0001-enforce-stopatheight-option.patch
+
+  sync:
+    desc: Sync the blockchain up to a specific height and stop
+    cmds:
+      - mkdir $(pwd)/peercoin-data
+      - docker run --rm -v $(pwd)/peercoin-data:/home/peercoin/.peercoin -u $(id -u):$(id -g) peercoin-node /usr/local/bin/peercoind -printtoconsole -stopatheight={{.STOP_HEIGHT}}
+
+  dump-utxos:
+    desc: Restart the node with network disabled and dump UTXOs
+    cmds:
+      - docker run --rm -v $(pwd)/peercoin-data:/home/peercoin/.peercoin -u $(id -u):$(id -g) -d --name peercoin-node-inactive peercoin-node /usr/local/bin/peercoind -networkactive=0
+      - |
+        while ! docker exec peercoin-node-inactive peercoin-cli getblockchaininfo >/dev/null 2>&1; do
+          sleep 1
+        done
+      - docker exec peercoin-node-inactive peercoin-cli dumptxoutset peercoin_utxos.dat
+      - docker cp peercoin-node-inactive:/home/peercoin/.peercoin/peercoin_utxos.dat ./peercoin_utxos.dat
+      - docker exec peercoin-node-inactive peercoin-cli stop
