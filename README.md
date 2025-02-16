@@ -39,12 +39,16 @@ This project automates the generation of UTXO (Unspent Transaction Output) dumps
 
 ### GitHub Actions Workflow
 
-1. Navigate to your repository's Actions tab
-2. Select Peercoin UTXO Dump
-3. Click Run workflow
-4. Specify desired block height (default: 1000)
-5. Monitor workflow execution
-6. Download UTXO dump from created release
+1. Fork this repository
+2. Navigate to your repository's Actions tab
+3. Select Peercoin UTXO Dump
+4. Click Run workflow
+5. Specify desired block height (default: 1000)
+6. Monitor workflow execution
+7. Download UTXO dump from created release  
+   e.g. https://github.com/patchcoin/dump-peercoin-utxos/releases/tag/utxo-dump-50000
+
+![run.gif](run.gif)
 
 ### Workflow Details
 
