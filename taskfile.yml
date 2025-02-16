@@ -15,7 +15,7 @@ tasks:
   sync:
     desc: Sync the blockchain up to a specific height and stop
     cmds:
-      - mkdir $(pwd)/peercoin-data
+      - mkdir -p $(pwd)/peercoin-data
       - docker run --rm -v $(pwd)/peercoin-data:/home/peercoin/.peercoin -u $(id -u):$(id -g) peercoin-node /usr/local/bin/peercoind -printtoconsole -stopatheight={{.STOP_HEIGHT}}
 
   dump-utxos:
@@ -29,3 +29,4 @@ tasks:
       - docker exec peercoin-node-inactive peercoin-cli dumptxoutset peercoin_utxos.dat
       - docker cp peercoin-node-inactive:/home/peercoin/.peercoin/peercoin_utxos.dat ./peercoin_utxos.dat
       - docker exec peercoin-node-inactive peercoin-cli stop
+      - mv $(pwd)/peercoin-data/peercoin_utxos.dat .
