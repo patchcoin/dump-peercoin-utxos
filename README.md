@@ -29,12 +29,12 @@ This project automates the generation of UTXO (Unspent Transaction Output) dumps
 
 2. Build the Docker image:
    ```bash
-    task build
+   task build
    ```
 
 3. Sync blockchain and generate UTXO dump (default height 1000):
    ```bash
-   task sync dump-utxos
+   env STOP_HEIGHT=1000 task sync dump-utxos
    ```
 
 ### GitHub Actions Workflow
@@ -77,7 +77,7 @@ task build
 env STOP_HEIGHT=50000 task sync
 
 # Generate UTXO dump
-task dump-utxos
+env STOP_HEIGHT=50000 task dump-utxos
 ```
 
 ### Technical Components
