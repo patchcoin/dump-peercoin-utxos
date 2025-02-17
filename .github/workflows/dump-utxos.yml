@@ -26,7 +26,9 @@ jobs:
           STOP_HEIGHT: ${{ github.event.inputs.stopHeight }}
         run: task sync
 
-      - run: task dump-utxos
+      - env:
+          STOP_HEIGHT: ${{ github.event.inputs.stopHeight }}
+        run: task dump-utxos
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
